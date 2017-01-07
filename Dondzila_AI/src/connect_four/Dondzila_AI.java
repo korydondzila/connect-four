@@ -60,76 +60,138 @@ public class Dondzila_AI
 			}
 		}
 		
-		int best = -1;
+		int best = Integer.MIN_VALUE;
 		ArrayList<Integer> bestCols = new ArrayList<Integer>();
+		Random r = new Random();
 		
 		for (Cell p : possibleMoves)
 		{
-			System.out.println( "CELL: " + p.getRow() + ", " + p.getCol() );
-			computeRank(p);
-			System.out.println( "RANK: " + p.getRank() );
-			if (p.getRank() > best)
+			int row = p.getRow(), col = p.getCol();
+			System.out.println( "CELL: " + row + ", " + col );
+			computeRank(p, player);
+			board[row][col] = player;
+			int oBest = Integer.MIN_VALUE;
+			ArrayList<Cell> oBbestCells = new ArrayList<Cell>();
+			
+			for (Cell o: possibleMoves)
 			{
-				best = p.getRank();
+				if (p.equals( o ))
+				{
+					if (row > 0)
+					{
+						Cell temp = new Cell(row - 1, col);
+						System.out.println( "O CELL: " + temp.getRow() + ", " + temp.getCol() );
+						computeRank( temp, opponent );
+						o.setRank( temp.getRank( opponent ), opponent );
+					}
+				}
+				else
+				{
+					System.out.println( "O CELL: " + o.getRow() + ", " + o.getCol() );
+					computeRank( o, opponent );
+				}
+				
+				if (o.getRank( opponent ) > oBest)
+				{
+					oBest = o.getRank( opponent );
+					oBbestCells.clear();
+					oBbestCells.add( o );
+				}
+				else if (o.getRank( opponent ) == oBest)
+				{
+					oBbestCells.add( o );
+				}
+			}
+			
+			board[row][col] = 0;
+			Cell oBestCell = oBbestCells.get( r.nextInt( oBbestCells.size() ) );
+			System.out.println( "pRank: " + p.getRank(player) + " oRank: " + oBestCell.getRank(opponent) );
+			int rank = p.getRank(player) - oBestCell.getRank(opponent);
+			System.out.println( "RANK: " + rank );
+			
+			if (rank > best)
+			{
+				best = rank;
 				bestCols.clear();
 				bestCols.add( p.getCol() );
 			}
-			else if (p.getRank() == best)
+			else if (rank == best)
 			{
 				bestCols.add( p.getCol() );
 			}
 		}
 		
-		Random r = new Random();
 		
 		return bestCols.get( r.nextInt(bestCols.size()) );
 	}
 	
-	void computeRank(Cell p)
+	void computeRank(Cell c, int id)
 	{
 		String[] dirs = {"ul", "l", "dl", "d", "dr", "r", "ur"};
-		Map<String, Integer> pRanks = new HashMap<String, Integer>();
-		Map<String, Integer> oRanks = new HashMap<String, Integer>();
-		int row = p.getRow();
-		int col = p.getCol();
+		Map<String, Integer[]> pRanks = new HashMap<String, Integer[]>();
 		
-		board[row][col] = player;
+		int oid = id == 1 ? 2 : 1;
 		
 		for (String dir : dirs)
 		{
-			pRanks.put( dir, dirRank(dir, row, col, 0, -1) );
-			if (row - 1 >= 0)
+			Integer[] dRank = dirRank(id, dir, c.getRow(), c.getCol(), 0, -1);
+			if (id == dRank[0] && dRank[1] >= 6)
 			{
-				int tempP = player;
-    			player = opponent;
-    			opponent = tempP;
-    			oRanks.put( dir, dirRank(dir, row - 1, col, 0, -1) );
-    			tempP = player;
-    			player = opponent;
-    			opponent = tempP;
+				dRank[1] += 10;
+			}
+			else if (oid == dRank[0] && dRank[1] >= 3)
+			{
+				dRank[1] += 5;
+			}
+			
+			pRanks.put( dir, dRank );
+		}
+		
+		int leftDiag = split( "ul", "dr", id, oid, pRanks );
+		int rightDiag = split( "dl", "ur", id, oid, pRanks );
+		int horiz = split( "l", "r", id, oid, pRanks );
+		
+		Integer[] d = pRanks.get( "d" );
+		int down = d[1];
+		if (player == id && id == d[0] && down >= 6)
+		{
+			down = Integer.MAX_VALUE;
+		}
+		else if (player == id && oid == d[0] && down >= 3)
+		{
+			down = Integer.MAX_VALUE / 2;
+		}
+		
+		int pRank = Math.max( leftDiag, Math.max( rightDiag, Math.max( horiz, down ) ) );
+		
+		c.setRank(pRank, id);
+	}
+	
+	int split(String dir1, String dir2, int id, int oid, Map<String,Integer[]> pRanks)
+	{
+		Integer[] s1 = pRanks.get(dir1), s2 = pRanks.get(dir2);
+		int rank = s1[1] + s2[1];
+		
+		if (s1[0] == s2[0])
+		{
+			if (player == id && id == s1[0] && rank >= 6)
+			{
+				rank = Integer.MAX_VALUE;
+			}
+			else if (player == id && oid == s1[0] && rank >= 3)
+			{
+				rank = Integer.MAX_VALUE / 2;
+			}
+			else
+			{
+				rank *= 2;
 			}
 		}
 		
-		board[row][col] = 0;
-		int pRank = 0, oRank = 0;
-		
-		pRank = Math.max( pRanks.get( "ul" ) + pRanks.get( "dr" ), 
-		            Math.max( pRanks.get( "l" ) + pRanks.get( "r" ), 
-		            Math.max( pRanks.get( "dl" ) + pRanks.get( "ur" ), pRanks.get( "d" ) ) ) );
-		
-		if (row - 1 >= 0)
-		{
-			oRank = Math.max( oRanks.get( "ul" ) + oRanks.get( "dr" ), 
-		  		        Math.max( oRanks.get( "l" ) + oRanks.get( "r" ), 
-		  			    Math.max( oRanks.get( "dl" ) + oRanks.get( "ur" ), oRanks.get( "d" ) ) ) );
-		}
-		
-		System.out.println( "pRank: " + pRank + " oRank: " + oRank );
-		
-		p.setRank( pRank - oRank );
+		return rank;
 	}
 	
-	int dirRank(String dir, int row, int col, int rank, int initial)
+	Integer[] dirRank(int id, String dir, int row, int col, int rank, int initial)
 	{
 		boolean move = false;
 		
@@ -201,16 +263,18 @@ public class Dondzila_AI
 			initial = board[row][col];
 		}
 		
-		if (move && player == initial && board[row][col] == player)
+		int oid = id == 1 ? 2 : 1;
+		
+		if (move && id == initial && board[row][col] == id)
 		{
-			rank = dirRank( dir, row, col, rank + 2, initial);
+			rank = dirRank(id, dir, row, col, rank + 2, initial)[1];
 		}
-		else if (move && opponent == initial && board[row][col] == opponent)
+		else if (move && oid == initial && board[row][col] == oid)
 		{
-			rank = dirRank( dir, row, col, rank + 1, initial);
+			rank = dirRank(id, dir, row, col, rank + 1, initial)[1];
 		}
 		
-		return rank;
+		return new Integer[]{initial, rank};
 	}
 
 	/**
@@ -246,7 +310,8 @@ class Cell
 {
 	private int row = -1;
 	private int col = -1;
-	private int rank = 0;
+	private int rankP1 = 0;
+	private int rankP2 = 0;
 	
 	public Cell(int row, int col)
 	{
@@ -273,16 +338,19 @@ class Cell
 	/**
 	 * @return the rank
 	 */
-	public int getRank()
+	public int getRank(int id)
 	{
-		return this.rank;
+		return id == 1 ? this.rankP1 : this.rankP2;
 	}
 
 	/**
 	 * @param rank the rank to set
 	 */
-	public void setRank( int rank )
+	public void setRank( int rank, int id )
 	{
-		this.rank = rank;
+		if (id == 1)
+			this.rankP1 = rank;
+		else
+			this.rankP2 = rank;
 	}
 }
