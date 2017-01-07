@@ -150,18 +150,7 @@ public class Dondzila_AI
 		int leftDiag = split( "ul", "dr", id, oid, pRanks );
 		int rightDiag = split( "dl", "ur", id, oid, pRanks );
 		int horiz = split( "l", "r", id, oid, pRanks );
-		
-		Integer[] d = pRanks.get( "d" );
-		int down = d[1];
-		if (player == id && id == d[0] && down >= 6)
-		{
-			down = Integer.MAX_VALUE;
-		}
-		else if (player == id && oid == d[0] && down >= 3)
-		{
-			down = Integer.MAX_VALUE / 2;
-		}
-		
+		int down = nonSplit( "d", id, oid, pRanks );
 		int pRank = Math.max( leftDiag, Math.max( rightDiag, Math.max( horiz, down ) ) );
 		
 		c.setRank(pRank, id);
@@ -170,6 +159,14 @@ public class Dondzila_AI
 	int split(String dir1, String dir2, int id, int oid, Map<String,Integer[]> pRanks)
 	{
 		Integer[] s1 = pRanks.get(dir1), s2 = pRanks.get(dir2);
+		s1[1] = nonSplit( dir1, id, oid, pRanks );
+		s2[1] = nonSplit( dir2, id, oid, pRanks );
+		
+		if (s1[1] == Integer.MAX_VALUE || s2[1] == Integer.MAX_VALUE)
+		{
+			return Integer.MAX_VALUE;
+		}
+		
 		int rank = s1[1] + s2[1];
 		
 		if (s1[0] == s2[0])
@@ -186,6 +183,23 @@ public class Dondzila_AI
 			{
 				rank *= 2;
 			}
+		}
+		
+		return rank;
+	}
+	
+	int nonSplit(String dir, int id, int oid, Map<String,Integer[]> pRanks)
+	{
+		Integer[] s = pRanks.get(dir);
+		int rank = s[1];
+		
+		if (player == id && id == s[0] && rank >= 6)
+		{
+			rank = Integer.MAX_VALUE;
+		}
+		else if (player == id && oid == s[0] && rank >= 3)
+		{
+			rank = Integer.MAX_VALUE / 2;
 		}
 		
 		return rank;
