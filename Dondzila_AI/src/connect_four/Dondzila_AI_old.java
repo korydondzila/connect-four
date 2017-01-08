@@ -21,7 +21,7 @@ import java.util.Random;
 /**
  * 
  */
-public class Dondzila_AI
+public class Dondzila_AI_old
 {
 	int[][] board;
 	int player;
@@ -33,7 +33,7 @@ public class Dondzila_AI
 	/**
 	 * 
 	 */
-	public Dondzila_AI(int[][] board, int player, int timeLimit, long startTime)
+	public Dondzila_AI_old(int[][] board, int player, int timeLimit, long startTime)
 	{
 		this.board = board;
 		this.player = player;
@@ -150,7 +150,7 @@ public class Dondzila_AI
 		int leftDiag = split( "ul", "dr", id, oid, pRanks );
 		int rightDiag = split( "dl", "ur", id, oid, pRanks );
 		int horiz = split( "l", "r", id, oid, pRanks );
-		int down = downRank( c.getRow(), id, oid, pRanks.get("d") );
+		int down = nonSplit( "d", id, oid, pRanks );
 		int pRank = Math.max( leftDiag, Math.max( rightDiag, Math.max( horiz, down ) ) );
 		
 		c.setRank(pRank, id);
@@ -159,20 +159,18 @@ public class Dondzila_AI
 	int split(String dir1, String dir2, int id, int oid, Map<String,Integer[]> pRanks)
 	{
 		Integer[] s1 = pRanks.get(dir1), s2 = pRanks.get(dir2);
-		s1[1] = nonSplit( dir1, id, oid, s1 );
-		s2[1] = nonSplit( dir2, id, oid, s2 );
+		s1[1] = nonSplit( dir1, id, oid, pRanks );
+		s2[1] = nonSplit( dir2, id, oid, pRanks );
 		
 		if (s1[1] == Integer.MAX_VALUE || s2[1] == Integer.MAX_VALUE)
 		{
 			return Integer.MAX_VALUE;
 		}
 		
-		int rank = 0;
+		int rank = s1[1] + s2[1];
 		
 		if (s1[0] == s2[0])
 		{
-			rank = s1[1] + s2[1];
-			
 			if (player == id && id == s1[0] && rank >= 6)
 			{
 				rank = Integer.MAX_VALUE;
@@ -181,128 +179,18 @@ public class Dondzila_AI
 			{
 				rank = Integer.MAX_VALUE / 2;
 			}
-			else if (id == s1[0] && rank <= 4)
-			{
-				if (s1[2] != 0 && s2[2] != 0)
-				{
-					rank -= rank >=2 ? 2 : rank;
-				}
-			}
-			else if (oid == s1[0] && rank <= 2)
-			{
-				if (s1[2] != 0 && s2[2] != 0)
-				{
-					rank -= rank >=1 ? 1 : 0;
-				}
-			}
 			else
 			{
 				rank *= 2;
 			}
 		}
-		else
-		{
-			if (id == s1[0] && oid == s2[0])
-			{
-				if (s1[1] <= 4 && s1[2] != 0)
-				{
-					s1[1] -= s1[1] >= 2 ? 2 : s1[1];
-				}
-				
-				if (s2[1] <= 2 && s2[2] != 0)
-				{
-					s2[1] -= s2[2] >= 1 ? 1 : 0;
-				}
-			}
-			else if (oid == s1[0] && id == s2[0])
-			{
-				if (s1[1] <= 2 && s1[2] != 0)
-				{
-					s1[1] -= s1[1] >= 1 ? 1 : 0;
-				}
-				
-				if (s2[1] <= 4 && s2[2] != 0)
-				{
-					s2[1] -= s2[1] >= 2 ? 2 : s2[1];
-				}
-			}
-			else
-			{
-				if (id == s1[0])
-				{
-					if (-1 == s2[0] && s1[1] <= 4)
-					{
-						s1[1] -= 2;
-					}
-					else if (0 == s2[0] && s1[1] <= 2)
-					{
-						s1[1] -= 1;
-					}
-				}
-				else if (oid == s1[0])
-				{
-					if (-1 == s2[0] && s1[1] <= 2)
-					{
-						s1[1] -= 1;
-					}
-				}
-				
-				if (id == s2[0])
-				{
-					if (-1 == s1[0] && s2[1] <= 4)
-					{
-						s2[1] -= 2;
-					}
-					else if (0 == s1[0] && s2[1] <= 2)
-					{
-						s2[1] -= 1;
-					}
-				}
-				else if (oid == s2[0])
-				{
-					if (-1 == s1[0] && s2[1] <= 2)
-					{
-						s2[1] -= 1;
-					}
-				}
-			}
-			
-			rank = s1[1] + s2[1];
-		}
 		
 		return rank;
 	}
 	
-	int downRank(int row, int id, int oid, Integer[] s)
+	int nonSplit(String dir, int id, int oid, Map<String,Integer[]> pRanks)
 	{
-		if (id == s[0])
-		{
-			if (s[1] <= 4 && row == 0)
-			{
-				return s[1] - 2;
-			}
-			else if (s[1] <=2 && row == 1)
-			{
-				return s[1] - 1;
-			}
-		}
-		else if (oid == s[0])
-		{
-			if (s[1] <= 2 && row == 0)
-			{
-				return s[1] - 1;
-			}
-			else if (s[1] <=1 && row == 1)
-			{
-				return s[1];
-			}
-		}
-		
-		return nonSplit( "d", id, oid, s );
-	}
-	
-	int nonSplit(String dir, int id, int oid, Integer[] s)
-	{
+		Integer[] s = pRanks.get(dir);
 		int rank = s[1];
 		
 		if (player == id && id == s[0] && rank >= 6)
@@ -320,7 +208,6 @@ public class Dondzila_AI
 	Integer[] dirRank(int id, String dir, int row, int col, int rank, int initial)
 	{
 		boolean move = false;
-		int last = -1;
 		
 		switch (dir)
 		{
@@ -385,35 +272,23 @@ public class Dondzila_AI
 				break;
 		}
 		
-		if (initial == -1 && move)
+		if (initial == -1)
 		{
 			initial = board[row][col];
 		}
 		
-		if (!move)
-		{
-			last = 0;
-		}
-		
 		int oid = id == 1 ? 2 : 1;
 		
-		if (move)
+		if (move && id == initial && board[row][col] == id)
 		{
-    		if (id == initial && board[row][col] == id)
-    		{
-    			return dirRank(id, dir, row, col, rank + 2, initial);
-    		}
-    		else if (oid == initial && board[row][col] == oid)
-    		{
-    			return dirRank(id, dir, row, col, rank + 1, initial);
-    		}
-    		else
-    		{
-    			last = board[row][col];
-    		}
+			rank = dirRank(id, dir, row, col, rank + 2, initial)[1];
+		}
+		else if (move && oid == initial && board[row][col] == oid)
+		{
+			rank = dirRank(id, dir, row, col, rank + 1, initial)[1];
 		}
 		
-		return new Integer[]{initial, rank, last};
+		return new Integer[]{initial, rank};
 	}
 
 	/**
@@ -434,7 +309,7 @@ public class Dondzila_AI
 					.mapToInt(Integer::parseInt).toArray();
 		}
 		
-		Dondzila_AI ai = new Dondzila_AI( board, playerNum, timeLimit, startTime );
+		Dondzila_AI_old ai = new Dondzila_AI_old( board, playerNum, timeLimit, startTime );
 		
 		int col = ai.computeMove();
 		long total = System.currentTimeMillis() - startTime;
@@ -443,53 +318,4 @@ public class Dondzila_AI
 		System.exit(col);
 	}
 
-}
-
-class Cell
-{
-	private int row = -1;
-	private int col = -1;
-	private int rankP1 = 0;
-	private int rankP2 = 0;
-	
-	public Cell(int row, int col)
-	{
-		this.col = col;
-		this.row = row;
-	}
-
-	/**
-	 * @return the col
-	 */
-	public int getCol()
-	{
-		return this.col;
-	}
-
-	/**
-	 * @return the row
-	 */
-	public int getRow()
-	{
-		return this.row;
-	}
-
-	/**
-	 * @return the rank
-	 */
-	public int getRank(int id)
-	{
-		return id == 1 ? this.rankP1 : this.rankP2;
-	}
-
-	/**
-	 * @param rank the rank to set
-	 */
-	public void setRank( int rank, int id )
-	{
-		if (id == 1)
-			this.rankP1 = rank;
-		else
-			this.rankP2 = rank;
-	}
 }
