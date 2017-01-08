@@ -135,14 +135,14 @@ public class Dondzila_AI
 		for (String dir : dirs)
 		{
 			Integer[] dRank = dirRank(id, dir, c.getRow(), c.getCol(), 0, -1);
-			if (id == dRank[0] && dRank[1] >= 6)
+			/*if (id == dRank[0] && dRank[1] >= 6)
 			{
 				dRank[1] += 10;
 			}
 			else if (oid == dRank[0] && dRank[1] >= 3)
 			{
 				dRank[1] += 5;
-			}
+			}*/
 			
 			pRanks.put( dir, dRank );
 		}
@@ -150,7 +150,7 @@ public class Dondzila_AI
 		int leftDiag = split( "ul", "dr", id, oid, pRanks );
 		int rightDiag = split( "dl", "ur", id, oid, pRanks );
 		int horiz = split( "l", "r", id, oid, pRanks );
-		int down = downRank( c.getRow(), id, oid, pRanks.get("d") );
+		int down = nonSplit( id, oid, pRanks.get("d") );
 		int pRank = Math.max( leftDiag, Math.max( rightDiag, Math.max( horiz, down ) ) );
 		
 		c.setRank(pRank, id);
@@ -159,8 +159,8 @@ public class Dondzila_AI
 	int split(String dir1, String dir2, int id, int oid, Map<String,Integer[]> pRanks)
 	{
 		Integer[] s1 = pRanks.get(dir1), s2 = pRanks.get(dir2);
-		s1[1] = nonSplit( dir1, id, oid, s1 );
-		s2[1] = nonSplit( dir2, id, oid, s2 );
+		s1[1] = nonSplit( id, oid, s1 );
+		s2[1] = nonSplit( id, oid, s2 );
 		
 		if (s1[1] == Integer.MAX_VALUE || s2[1] == Integer.MAX_VALUE)
 		{
@@ -173,11 +173,11 @@ public class Dondzila_AI
 		{
 			rank = s1[1] + s2[1];
 			
-			if (player == id && id == s1[0] && rank >= 6)
+			if (/*player == id && */id == s1[0] && rank >= 6)
 			{
 				rank = Integer.MAX_VALUE;
 			}
-			else if (player == id && oid == s1[0] && rank >= 3)
+			else if (/*player == id && */oid == s1[0] && rank >= 3)
 			{
 				rank = Integer.MAX_VALUE / 2;
 			}
@@ -298,18 +298,18 @@ public class Dondzila_AI
 			}
 		}
 		
-		return nonSplit( "d", id, oid, s );
+		return nonSplit( id, oid, s );
 	}
 	
-	int nonSplit(String dir, int id, int oid, Integer[] s)
+	int nonSplit(int id, int oid, Integer[] s)
 	{
 		int rank = s[1];
 		
-		if (player == id && id == s[0] && rank >= 6)
+		if (/*player == id && */id == s[0] && rank >= 6)
 		{
 			rank = Integer.MAX_VALUE;
 		}
-		else if (player == id && oid == s[0] && rank >= 3)
+		else if (/*player == id && */oid == s[0] && rank >= 3)
 		{
 			rank = Integer.MAX_VALUE / 2;
 		}
