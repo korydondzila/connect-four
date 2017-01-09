@@ -1,20 +1,9 @@
-/**
- * File:       MinMaxTree.java
- * Package:    connect_four
- * Project:    Dondzila_AI
- * Date:       Jan 8, 2017, 2:39:17 PM
- * Purpose:    
- * @author     Kory Dondzila
- * @version    "%I%, %G%"
- * Copyright:  2017
- */
-
 package connect_four;
 
 import java.util.ArrayList;
 
 /**
- * 
+ * Simple tree used to keep track of all moves
  */
 public class MinMaxTree
 {
@@ -55,6 +44,7 @@ public class MinMaxTree
 	}
 }
 
+// Base node class
 class Node
 {
 	protected ArrayList<MoveNode> possibleMoves;
@@ -78,6 +68,7 @@ class Node
 	}
 }
 
+// Move node stores information about each move
 class MoveNode extends Node
 {
 	private int row;
@@ -97,10 +88,12 @@ class MoveNode extends Node
 		this.opponent = player == 1 ? 2 : 1;
 	}
 	
+	//Add subsequent moves
 	public void addMoves(ArrayList<MoveNode> moves)
 	{
 		for (MoveNode move : moves)
 		{
+			// Move that is the same needs to be moved up a row
 			if (row == move.getRow() && col == move.getCol())
 			{
 				if (0 < row)

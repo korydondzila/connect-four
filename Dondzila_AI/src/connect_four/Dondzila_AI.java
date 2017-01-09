@@ -1,14 +1,3 @@
-/**
- * File:       Dondzila_AI.java
- * Package:    connect_four
- * Project:    connect_four
- * Date:       Jan 6, 2017, 12:13:34 PM
- * Purpose:    
- * @author     Kory Dondzila
- * @version    "%I%, %G%"
- * Copyright:  2017
- */
-
 package connect_four;
 
 import java.util.ArrayList;
@@ -18,23 +7,18 @@ import java.util.Map;
 import java.util.Random;
 
 
-/**
- * 
- */
 public class Dondzila_AI
 {
 	int player;
 	int opponent;
 	int timeLimit;
 	long startTime;
-	int lookAhead = 8;
+	int lookAhead = 6;
 	MinMaxTree tree = new MinMaxTree();
 	ArrayList<MoveNode> possibleMoves = new ArrayList<MoveNode>();
 	Random r = new Random();
 	
-	/**
-	 * 
-	 */
+	
 	public Dondzila_AI(int[][] board, int player, int timeLimit, long startTime)
 	{
 		this.player = player;
@@ -44,6 +28,7 @@ public class Dondzila_AI
 		
 		int open = 0;
 		
+		// Get initial moves
 		for (int col = 0; col < 7; col++)
 		{
 			if (board[0][col] == 0)
@@ -61,9 +46,9 @@ public class Dondzila_AI
 			}
 		}
 		
-		//if (open <= 38) lookAhead = 8;
-		/*else*/ if (player == 1 && open <= 36) lookAhead = 42;
-		else if (player == 2 && open <= 34) lookAhead = 42;
+		//Adjust lookahead based on open spaces remaining
+		//if (open <= 24) lookAhead = 10;
+		//else if (open <= 18) lookAhead = 42;
 		
 		tree.getRoot().addMoves( possibleMoves );
 	}
@@ -75,10 +60,12 @@ public class Dondzila_AI
 		
 		if (current == tree.getRoot())
 		{
+			// On root use threads
 			ArrayList<AIRunnable> threads = new ArrayList<AIRunnable>();
 			
 			for (MoveNode p : current.getPossibleMoves())
 			{
+				// Get initial values and moves
 				computeRank(p, p.getPlayer(), board);
 				p.addMoves( current.getPossibleMoves() );
 				AIRunnable a = new AIRunnable( p, this, board );
@@ -97,11 +84,11 @@ public class Dondzila_AI
 				System.out.println( "Main interrupted" );
 			}
 			
+			// Find best move out of threads
 			for (AIRunnable r : threads)
 			{
 				MoveNode p = r.getMove();
 				int rank = p.getRank();
-				System.out.println( r.runner.getName() + " rank: " + rank + " col: " + p.getCol());
 				
     			if (rank > best)
     			{
@@ -111,6 +98,7 @@ public class Dondzila_AI
     			}
     			else if (rank == best)
     			{
+    				// Choose best move that has shallow depth
     				if (bestMoves.isEmpty())
     				{
     					bestMoves.add( p );
@@ -131,9 +119,11 @@ public class Dondzila_AI
 		{
     		for (MoveNode p : current.getPossibleMoves())
     		{
+    			// get rank for each move
     			int row = p.getRow(), col = p.getCol();
     			computeRank(p, p.getPlayer(), board);
     			
+    			// move down the tree if needed
     			if (Integer.MAX_VALUE != p.getRank() && p.getHeight() < lookAhead)
     			{
     				p.addMoves( current.getPossibleMoves() );
@@ -142,6 +132,8 @@ public class Dondzila_AI
     				{
     					board[row][col] = p.getPlayer();
     					MoveNode m = computeMove(p, board);
+    					
+    					// set new rank and depth
     					p.setRank( m.getRank() );
     					p.setDepth( m.getDepth() );
     					board[row][col] = 0;
@@ -158,6 +150,7 @@ public class Dondzila_AI
     			
     			int rank = p.getRank();
     			
+    			// Take best move possible
     			if (Integer.MAX_VALUE != rank)
     			{
         			if (rank > best)
@@ -193,8 +186,10 @@ public class Dondzila_AI
     		}
 		}
 		
+		// In case of equal moves, choose one
 		MoveNode ret = bestMoves.get( r.nextInt(bestMoves.size()) );
 		
+		// Subtract best from current except on root
 		if (current != tree.getRoot())
 		{
     		ret.setRank( ((MoveNode)current).getRank() - ret.getRank() );
@@ -210,11 +205,13 @@ public class Dondzila_AI
 		
 		int oid = c.getOpponent();
 		
+		// Get rank in each direction
 		for (String dir : dirs)
 		{
 			pRanks.put( dir, dirRank(id, dir, c.getRow(), c.getCol(), 0, -1, board) );
 		}
 		
+		// Get the maximum rank of all directions
 		int leftDiag = split( "ul", "dr", id, oid, pRanks );
 		int rightDiag = split( "dl", "ur", id, oid, pRanks );
 		int horiz = split( "l", "r", id, oid, pRanks );
@@ -224,9 +221,12 @@ public class Dondzila_AI
 		c.setRank(pRank);
 	}
 	
+	// Makes adjustments on diagonals and horizonal ranks
 	int split(String dir1, String dir2, int id, int oid, Map<String,Integer[]> pRanks)
 	{
 		Integer[] s1 = pRanks.get(dir1), s2 = pRanks.get(dir2);
+		
+		// First adjust single direction
 		s1[1] = nonSplit( id, oid, s1 );
 		s2[1] = nonSplit( id, oid, s2 );
 		
@@ -237,6 +237,7 @@ public class Dondzila_AI
 		
 		int rank = 0;
 		
+		// If pieces are same on both sides accumulate and adjust accordingly
 		if (s1[0] == s2[0])
 		{
 			rank = s1[1] + s2[1];
@@ -249,6 +250,7 @@ public class Dondzila_AI
 			{
 				rank = Integer.MAX_VALUE / 2;
 			}
+			// Prevent bad moves
 			else if (id == s1[0] && rank <= 4)
 			{
 				if (s1[2] != 0 && s2[2] != 0)
@@ -268,8 +270,11 @@ public class Dondzila_AI
 				rank *= 2;
 			}
 		}
-		else
+		else // Otherwise adjust indivually and then accumulate
 		{
+			// Different amounts if pieces are different or
+			// there is board edge or open space
+			// prevents bad moves
 			if (id == s1[0] && oid == s2[0])
 			{
 				if (s1[1] <= 4 && s1[2] != 0)
@@ -341,8 +346,10 @@ public class Dondzila_AI
 		return rank;
 	}
 	
+	// Adjust the rank when near top, prevents bad moves
 	int downRank(int row, int id, int oid, Integer[] s)
 	{
+		// Different amounts if pieces below are current players or opponents
 		if (id == s[0])
 		{
 			if (s[1] <= 4 && row == 0)
@@ -369,6 +376,7 @@ public class Dondzila_AI
 		return nonSplit( id, oid, s );
 	}
 	
+	// Adjusts score for individual directions, forcing wins or block wins
 	int nonSplit(int id, int oid, Integer[] s)
 	{
 		int rank = s[1];
@@ -385,11 +393,13 @@ public class Dondzila_AI
 		return rank;
 	}
 	
+	// Gets the rank in a single direction
 	Integer[] dirRank(int id, String dir, int row, int col, int rank, int initial, int[][] board)
 	{
 		boolean move = false;
 		int last = -1;
 		
+		// Move in direction if possible
 		switch (dir)
 		{
 			case "ul":
@@ -453,20 +463,22 @@ public class Dondzila_AI
 				break;
 		}
 		
+		// determine initial piece
 		if (initial == -1 && move)
 		{
 			initial = board[row][col];
 		}
 		
+		// hit edge, no last piece
 		if (!move)
 		{
 			last = 0;
 		}
-		
-		int oid = id == 1 ? 2 : 1;
-		
-		if (move)
+		else
 		{
+			int oid = id == 1 ? 2 : 1;
+			
+			// Recursively add to rank based on pieces seen
     		if (id == initial && board[row][col] == id)
     		{
     			return dirRank(id, dir, row, col, rank + 2, initial, board);
@@ -512,6 +524,7 @@ public class Dondzila_AI
 	}
 }
 
+// Used to start threads, each thread takes a starting move
 class AIRunnable implements Runnable
 {
 	private volatile MoveNode startNode;
@@ -519,14 +532,13 @@ class AIRunnable implements Runnable
 	int[][] board;
 	Thread runner;
 	
-	/**
-	 * 
-	 */
 	public AIRunnable(MoveNode startNode, Dondzila_AI ai, int[][] board)
 	{
 		this.startNode = startNode;
 		this.ai = ai;
 		this.board = new int[6][7];
+		
+		// Needs a copy of the board
 		for (int i = 0; i < 6; i++)
 		{
 			System.arraycopy( board[i], 0, this.board[i], 0, 7 );
@@ -542,6 +554,7 @@ class AIRunnable implements Runnable
 	@Override
 	public void run()
 	{
+		// compute the move from starting move
 		MoveNode move = ai.computeMove( startNode, board );
 		startNode.setRank( move.getRank() );
 		startNode.setDepth( move.getDepth() );
