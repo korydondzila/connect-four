@@ -16,7 +16,7 @@ public class Dondzila_AI
 	int lookAhead = 6;
 	MinMaxTree tree = new MinMaxTree();
 	ArrayList<MoveNode> possibleMoves = new ArrayList<MoveNode>();
-	Random r = new Random();
+	Random rand = new Random();
 	
 	
 	public Dondzila_AI(int[][] board, int player, int timeLimit, long startTime)
@@ -47,8 +47,8 @@ public class Dondzila_AI
 		}
 		
 		//Adjust lookahead based on open spaces remaining
-		//if (open <= 24) lookAhead = 10;
-		//else if (open <= 18) lookAhead = 42;
+		//if (open <= 22) lookAhead = 10;
+		//else if (open <= 16) lookAhead = 42;
 		
 		tree.getRoot().addMoves( possibleMoves );
 	}
@@ -63,92 +63,108 @@ public class Dondzila_AI
 			// On root use threads
 			ArrayList<AIRunnable> threads = new ArrayList<AIRunnable>();
 			
-			for (MoveNode p : current.getPossibleMoves())
+			for (MoveNode move : current.getPossibleMoves())
 			{
 				// Get initial values and moves
-				computeRank(p, p.getPlayer(), board);
-				p.addMoves( current.getPossibleMoves() );
-				AIRunnable a = new AIRunnable( p, this, board );
-				threads.add( a );
+				computeRank(move, move.getPlayer(), board);
+				move.addMoves( current.getPossibleMoves() );
+				AIRunnable thread = new AIRunnable( move, this, board );
+				threads.add( thread );
+				
+				if (!move.getPossibleMoves().isEmpty())
+				{
+					thread.runner.start();
+				}
 			}
 			
 			try
 			{
-				for (AIRunnable r : threads)
+				for (AIRunnable thread : threads)
 				{
-					r.runner.join();
+					thread.runner.join();
 				}
 			}
 			catch (InterruptedException e)
 			{
 				System.out.println( "Main interrupted" );
+				return possibleMoves.get( rand.nextInt( possibleMoves.size() ) );
 			}
 			
 			// Find best move out of threads
-			for (AIRunnable r : threads)
+			for (AIRunnable thread : threads)
 			{
-				MoveNode p = r.getMove();
-				int rank = p.getRank();
+				MoveNode move = thread.getMove();
+				int rank = move.getRank();
 				
     			if (rank > best)
     			{
     				best = rank;
     				bestMoves.clear();
-    				bestMoves.add( p );
+    				bestMoves.add( move );
     			}
     			else if (rank == best)
     			{
     				// Choose best move that has shallow depth
     				if (bestMoves.isEmpty())
     				{
-    					bestMoves.add( p );
+    					bestMoves.add( move );
     				}
-    				else if (p.getDepth() < bestMoves.get( 0 ).getDepth())
+    				else if (move.getDepth() > bestMoves.get( 0 ).getDepth())
     				{
     					bestMoves.clear();
-        				bestMoves.add( p );
+        				bestMoves.add( move );
     				}
-    				else if (p.getDepth() == bestMoves.get( 0 ).getDepth())
+    				/*else if (rank < 0 && move.getDepth() > bestMoves.get( 0 ).getDepth())
     				{
-    					bestMoves.add( p );
+    					bestMoves.clear();
+        				bestMoves.add( move );
+    				}
+    				else if (rank >= 0 && move.getDepth() < bestMoves.get( 0 ).getDepth())
+    				{
+    					bestMoves.clear();
+        				bestMoves.add( move );
+    				}*/
+    				else if (move.getDepth() == bestMoves.get( 0 ).getDepth())
+    				{
+    					bestMoves.add( move );
     				}
     			}
 			}
 		}
 		else
 		{
-    		for (MoveNode p : current.getPossibleMoves())
+    		for (MoveNode move : current.getPossibleMoves())
     		{
     			// get rank for each move
-    			int row = p.getRow(), col = p.getCol();
-    			computeRank(p, p.getPlayer(), board);
+    			int row = move.getRow(), col = move.getCol();
+    			computeRank(move, move.getPlayer(), board);
     			
     			// move down the tree if needed
-    			if (Integer.MAX_VALUE != p.getRank() && p.getHeight() < lookAhead)
+    			if (Integer.MAX_VALUE != move.getRank() && move.getHeight() < lookAhead)
     			{
-    				p.addMoves( current.getPossibleMoves() );
+    				move.addMoves( current.getPossibleMoves() );
     				
-    				if (!p.getPossibleMoves().isEmpty())
+    				if (!move.getPossibleMoves().isEmpty())
     				{
-    					board[row][col] = p.getPlayer();
-    					MoveNode m = computeMove(p, board);
+    					board[row][col] = move.getPlayer();
+    					MoveNode m = computeMove(move, board);
     					
     					// set new rank and depth
-    					p.setRank( m.getRank() );
-    					p.setDepth( m.getDepth() );
+    					move.setRank( m.getRank() );
+    					move.setDepth( m.getDepth() );
     					board[row][col] = 0;
     				}
     				else
     				{
-    					p.setDepth( p.getHeight() );
+    					move.setDepth( move.getHeight() );
     				}
     			}
     			else
     			{
-    				p.setDepth( p.getHeight() );
+    				move.setDepth( move.getHeight() );
     			}
     			
-    			int rank = p.getRank();
+    			int rank = move.getRank();
     			
     			// Take best move possible
     			if (Integer.MAX_VALUE != rank)
@@ -157,22 +173,32 @@ public class Dondzila_AI
         			{
         				best = rank;
         				bestMoves.clear();
-        				bestMoves.add( p );
+        				bestMoves.add( move );
         			}
         			else if (rank == best)
         			{
         				if (bestMoves.isEmpty())
         				{
-        					bestMoves.add( p );
+        					bestMoves.add( move );
         				}
-        				else if (p.getDepth() < bestMoves.get( 0 ).getDepth())
+        				else if (move.getDepth() < bestMoves.get( 0 ).getDepth())
         				{
         					bestMoves.clear();
-            				bestMoves.add( p );
+            				bestMoves.add( move );
         				}
-        				else if (p.getDepth() == bestMoves.get( 0 ).getDepth())
+        				/*else if (rank < 0 && move.getDepth() > bestMoves.get( 0 ).getDepth())
         				{
-        					bestMoves.add( p );
+        					bestMoves.clear();
+            				bestMoves.add( move );
+        				}
+        				else if (rank >= 0 && move.getDepth() < bestMoves.get( 0 ).getDepth())
+        				{
+        					bestMoves.clear();
+            				bestMoves.add( move );
+        				}*/
+        				else if (move.getDepth() == bestMoves.get( 0 ).getDepth())
+        				{
+        					bestMoves.add( move );
         				}
         			}
     			}
@@ -180,14 +206,14 @@ public class Dondzila_AI
     			{
     				best = rank;
     				bestMoves.clear();
-    				bestMoves.add( p );
+    				bestMoves.add( move );
     				break;
     			}
     		}
 		}
 		
 		// In case of equal moves, choose one
-		MoveNode ret = bestMoves.get( r.nextInt(bestMoves.size()) );
+		MoveNode ret = bestMoves.get( rand.nextInt(bestMoves.size()) );
 		
 		// Subtract best from current except on root
 		if (current != tree.getRoot())
@@ -198,27 +224,27 @@ public class Dondzila_AI
 		return ret;
 	}
 	
-	void computeRank(MoveNode c, int id, int[][] board)
+	void computeRank(MoveNode move, int id, int[][] board)
 	{
 		String[] dirs = {"ul", "l", "dl", "d", "dr", "r", "ur"};
 		Map<String, Integer[]> pRanks = new HashMap<String, Integer[]>();
 		
-		int oid = c.getOpponent();
+		int oid = move.getOpponent();
 		
 		// Get rank in each direction
 		for (String dir : dirs)
 		{
-			pRanks.put( dir, dirRank(id, dir, c.getRow(), c.getCol(), 0, -1, board) );
+			pRanks.put( dir, dirRank(id, dir, move.getRow(), move.getCol(), 0, -1, board) );
 		}
 		
 		// Get the maximum rank of all directions
 		int leftDiag = split( "ul", "dr", id, oid, pRanks );
 		int rightDiag = split( "dl", "ur", id, oid, pRanks );
 		int horiz = split( "l", "r", id, oid, pRanks );
-		int down = downRank( c.getRow(), id, oid, pRanks.get("d") ); //nonSplit( id, oid, pRanks.get("d") );
+		int down = downRank( move.getRow(), id, oid, pRanks.get("d") ); //nonSplit( id, oid, pRanks.get("d") );
 		int pRank = Math.max( leftDiag, Math.max( rightDiag, Math.max( horiz, down ) ) );
 		
-		c.setRank(pRank);
+		move.setRank(pRank);
 	}
 	
 	// Makes adjustments on diagonals and horizonal ranks
@@ -270,7 +296,7 @@ public class Dondzila_AI
 				rank *= 2;
 			}
 		}
-		else // Otherwise adjust indivually and then accumulate
+		else // Otherwise adjust individually and then accumulate
 		{
 			// Different amounts if pieces are different or
 			// there is board edge or open space
@@ -517,8 +543,8 @@ public class Dondzila_AI
 		Dondzila_AI ai = new Dondzila_AI( board, playerNum, timeLimit, startTime );
 		
 		MoveNode move = ai.computeMove(ai.tree.getRoot(), board);
-		long total = System.currentTimeMillis() - startTime;
-		System.out.println( "\nTIME TAKEN: " + (total / 1000.f) + "s\n");
+		//long total = System.currentTimeMillis() - startTime;
+		//System.out.println( "\nTIME TAKEN: " + (total / 1000.f) + "s\n");
 		
 		System.exit(move.getCol());
 	}
@@ -545,7 +571,6 @@ class AIRunnable implements Runnable
 		}
 		
 		runner = new Thread(this);
-		runner.start();
 	}
 
 	/* (non-Javadoc)

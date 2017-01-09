@@ -1,14 +1,3 @@
-/**
- * File:       Dondzila_AI.java
- * Package:    connect_four
- * Project:    connect_four
- * Date:       Jan 6, 2017, 12:13:34 PM
- * Purpose:    
- * @author     Kory Dondzila
- * @version    "%I%, %G%"
- * Copyright:  2017
- */
-
 package connect_four;
 
 import java.util.ArrayList;
@@ -18,41 +7,38 @@ import java.util.Map;
 import java.util.Random;
 
 
-/**
- * 
- */
 public class Dondzila_AI_old
 {
-	int[][] board;
 	int player;
 	int opponent;
 	int timeLimit;
 	long startTime;
-	ArrayList<Cell> possibleMoves = new ArrayList<Cell>();
+	int lookAhead = 6;
+	MinMaxTree tree = new MinMaxTree();
+	ArrayList<MoveNode> possibleMoves = new ArrayList<MoveNode>();
+	Random r = new Random();
 	
-	/**
-	 * 
-	 */
+	
 	public Dondzila_AI_old(int[][] board, int player, int timeLimit, long startTime)
 	{
-		this.board = board;
 		this.player = player;
 		this.opponent = player == 1 ? 2 : 1;
 		this.timeLimit = timeLimit;
 		this.startTime = startTime;
-	}
-	
-	public int computeMove()
-	{
-		for (int i = 0; i < 7; i++)
+		
+		int open = 0;
+		
+		// Get initial moves
+		for (int col = 0; col < 7; col++)
 		{
-			if (board[0][i] == 0)
+			if (board[0][col] == 0)
 			{
-				for (int j = 5; j >= 0; j--)
+				for (int row = 5; row >= 0; row--)
 				{
-					if (board[j][i] == 0)
+					if (board[row][col] == 0)
 					{
-						possibleMoves.add( new Cell(j, i) );
+						open += row + 1;
+						possibleMoves.add( new MoveNode(row, col, 1, player) );
 						break;
 					}
 					
@@ -60,92 +46,192 @@ public class Dondzila_AI_old
 			}
 		}
 		
-		int best = Integer.MIN_VALUE;
-		ArrayList<Integer> bestCols = new ArrayList<Integer>();
-		Random r = new Random();
+		//Adjust lookahead based on open spaces remaining
+		//if (open <= 24) lookAhead = 10;
+		//else if (open <= 18) lookAhead = 42;
 		
-		for (Cell p : possibleMoves)
-		{
-			int row = p.getRow(), col = p.getCol();
-			computeRank(p, player);
-			board[row][col] = player;
-			int oBest = Integer.MIN_VALUE;
-			ArrayList<Cell> oBbestCells = new ArrayList<Cell>();
-			
-			for (Cell o: possibleMoves)
-			{
-				if (p.equals( o ))
-				{
-					if (row > 0)
-					{
-						Cell temp = new Cell(row - 1, col);
-						computeRank( temp, opponent );
-						o.setRank( temp.getRank( opponent ), opponent );
-					}
-				}
-				else
-				{
-					computeRank( o, opponent );
-				}
-				
-				if (o.getRank( opponent ) > oBest)
-				{
-					oBest = o.getRank( opponent );
-					oBbestCells.clear();
-					oBbestCells.add( o );
-				}
-				else if (o.getRank( opponent ) == oBest)
-				{
-					oBbestCells.add( o );
-				}
-			}
-			
-			board[row][col] = 0;
-			Cell oBestCell = oBbestCells.get( r.nextInt( oBbestCells.size() ) );
-			int rank = p.getRank(player) - oBestCell.getRank(opponent);
-			
-			if (rank > best)
-			{
-				best = rank;
-				bestCols.clear();
-				bestCols.add( p.getCol() );
-			}
-			else if (rank == best)
-			{
-				bestCols.add( p.getCol() );
-			}
-		}
-		
-		
-		return bestCols.get( r.nextInt(bestCols.size()) );
+		tree.getRoot().addMoves( possibleMoves );
 	}
 	
-	void computeRank(Cell c, int id)
+	public MoveNode computeMove(Node current, int[][] board)
+	{
+		int best = Integer.MIN_VALUE;
+		ArrayList<MoveNode> bestMoves = new ArrayList<MoveNode>();
+		
+		if (current == tree.getRoot())
+		{
+			// On root use threads
+			ArrayList<AIRunnable_old> threads = new ArrayList<AIRunnable_old>();
+			
+			for (MoveNode p : current.getPossibleMoves())
+			{
+				// Get initial values and moves
+				computeRank(p, p.getPlayer(), board);
+				p.addMoves( current.getPossibleMoves() );
+				AIRunnable_old a = new AIRunnable_old( p, this, board );
+				threads.add( a );
+				
+				if (!p.getPossibleMoves().isEmpty())
+				{
+					a.runner.start();
+				}
+			}
+			
+			try
+			{
+				for (AIRunnable_old r : threads)
+				{
+					r.runner.join();
+				}
+			}
+			catch (InterruptedException e)
+			{
+				System.out.println( "Main interrupted" );
+			}
+			
+			// Find best move out of threads
+			for (AIRunnable_old r : threads)
+			{
+				MoveNode p = r.getMove();
+				int rank = p.getRank();
+				
+    			if (rank > best)
+    			{
+    				best = rank;
+    				bestMoves.clear();
+    				bestMoves.add( p );
+    			}
+    			else if (rank == best)
+    			{
+    				// Choose best move that has shallow depth
+    				if (bestMoves.isEmpty())
+    				{
+    					bestMoves.add( p );
+    				}
+    				else if (p.getDepth() < bestMoves.get( 0 ).getDepth())
+    				{
+    					bestMoves.clear();
+        				bestMoves.add( p );
+    				}
+    				else if (p.getDepth() == bestMoves.get( 0 ).getDepth())
+    				{
+    					bestMoves.add( p );
+    				}
+    			}
+			}
+		}
+		else
+		{
+    		for (MoveNode p : current.getPossibleMoves())
+    		{
+    			// get rank for each move
+    			int row = p.getRow(), col = p.getCol();
+    			computeRank(p, p.getPlayer(), board);
+    			
+    			// move down the tree if needed
+    			if (Integer.MAX_VALUE != p.getRank() && p.getHeight() < lookAhead)
+    			{
+    				p.addMoves( current.getPossibleMoves() );
+    				
+    				if (!p.getPossibleMoves().isEmpty())
+    				{
+    					board[row][col] = p.getPlayer();
+    					MoveNode m = computeMove(p, board);
+    					
+    					// set new rank and depth
+    					p.setRank( m.getRank() );
+    					p.setDepth( m.getDepth() );
+    					board[row][col] = 0;
+    				}
+    				else
+    				{
+    					p.setDepth( p.getHeight() );
+    				}
+    			}
+    			else
+    			{
+    				p.setDepth( p.getHeight() );
+    			}
+    			
+    			int rank = p.getRank();
+    			
+    			// Take best move possible
+    			if (Integer.MAX_VALUE != rank)
+    			{
+        			if (rank > best)
+        			{
+        				best = rank;
+        				bestMoves.clear();
+        				bestMoves.add( p );
+        			}
+        			else if (rank == best)
+        			{
+        				if (bestMoves.isEmpty())
+        				{
+        					bestMoves.add( p );
+        				}
+        				else if (p.getDepth() < bestMoves.get( 0 ).getDepth())
+        				{
+        					bestMoves.clear();
+            				bestMoves.add( p );
+        				}
+        				else if (p.getDepth() == bestMoves.get( 0 ).getDepth())
+        				{
+        					bestMoves.add( p );
+        				}
+        			}
+    			}
+    			else
+    			{
+    				best = rank;
+    				bestMoves.clear();
+    				bestMoves.add( p );
+    				break;
+    			}
+    		}
+		}
+		
+		// In case of equal moves, choose one
+		MoveNode ret = bestMoves.get( r.nextInt(bestMoves.size()) );
+		
+		// Subtract best from current except on root
+		if (current != tree.getRoot())
+		{
+    		ret.setRank( ((MoveNode)current).getRank() - ret.getRank() );
+		}
+		
+		return ret;
+	}
+	
+	void computeRank(MoveNode c, int id, int[][] board)
 	{
 		String[] dirs = {"ul", "l", "dl", "d", "dr", "r", "ur"};
 		Map<String, Integer[]> pRanks = new HashMap<String, Integer[]>();
 		
-		int oid = id == 1 ? 2 : 1;
+		int oid = c.getOpponent();
 		
+		// Get rank in each direction
 		for (String dir : dirs)
 		{
-			Integer[] dRank = dirRank(id, dir, c.getRow(), c.getCol(), 0, -1);
-			
-			pRanks.put( dir, dRank );
+			pRanks.put( dir, dirRank(id, dir, c.getRow(), c.getCol(), 0, -1, board) );
 		}
 		
+		// Get the maximum rank of all directions
 		int leftDiag = split( "ul", "dr", id, oid, pRanks );
 		int rightDiag = split( "dl", "ur", id, oid, pRanks );
 		int horiz = split( "l", "r", id, oid, pRanks );
-		int down = downRank( c.getRow(), id, oid, pRanks.get("d") );
+		int down = downRank( c.getRow(), id, oid, pRanks.get("d") ); //nonSplit( id, oid, pRanks.get("d") );
 		int pRank = Math.max( leftDiag, Math.max( rightDiag, Math.max( horiz, down ) ) );
 		
-		c.setRank(pRank, id);
+		c.setRank(pRank);
 	}
 	
+	// Makes adjustments on diagonals and horizonal ranks
 	int split(String dir1, String dir2, int id, int oid, Map<String,Integer[]> pRanks)
 	{
 		Integer[] s1 = pRanks.get(dir1), s2 = pRanks.get(dir2);
+		
+		// First adjust single direction
 		s1[1] = nonSplit( id, oid, s1 );
 		s2[1] = nonSplit( id, oid, s2 );
 		
@@ -156,18 +242,20 @@ public class Dondzila_AI_old
 		
 		int rank = 0;
 		
+		// If pieces are same on both sides accumulate and adjust accordingly
 		if (s1[0] == s2[0])
 		{
 			rank = s1[1] + s2[1];
 			
-			if (/*player == id && */id == s1[0] && rank >= 6)
+			if (id == s1[0] && rank >= 6)
 			{
 				rank = Integer.MAX_VALUE;
 			}
-			else if (/*player == id && */oid == s1[0] && rank >= 3)
+			else if (oid == s1[0] && rank >= 3)
 			{
 				rank = Integer.MAX_VALUE / 2;
 			}
+			// Prevent bad moves
 			else if (id == s1[0] && rank <= 4)
 			{
 				if (s1[2] != 0 && s2[2] != 0)
@@ -187,8 +275,11 @@ public class Dondzila_AI_old
 				rank *= 2;
 			}
 		}
-		else
+		else // Otherwise adjust indivually and then accumulate
 		{
+			// Different amounts if pieces are different or
+			// there is board edge or open space
+			// prevents bad moves
 			if (id == s1[0] && oid == s2[0])
 			{
 				if (s1[1] <= 4 && s1[2] != 0)
@@ -260,8 +351,10 @@ public class Dondzila_AI_old
 		return rank;
 	}
 	
+	// Adjust the rank when near top, prevents bad moves
 	int downRank(int row, int id, int oid, Integer[] s)
 	{
+		// Different amounts if pieces below are current players or opponents
 		if (id == s[0])
 		{
 			if (s[1] <= 4 && row == 0)
@@ -288,15 +381,16 @@ public class Dondzila_AI_old
 		return nonSplit( id, oid, s );
 	}
 	
+	// Adjusts score for individual directions, forcing wins or block wins
 	int nonSplit(int id, int oid, Integer[] s)
 	{
 		int rank = s[1];
 		
-		if (/*player == id && */id == s[0] && rank >= 6)
+		if (id == s[0] && rank >= 6)
 		{
 			rank = Integer.MAX_VALUE;
 		}
-		else if (/*player == id && */oid == s[0] && rank >= 3)
+		else if (oid == s[0] && rank >= 3)
 		{
 			rank = Integer.MAX_VALUE / 2;
 		}
@@ -304,11 +398,13 @@ public class Dondzila_AI_old
 		return rank;
 	}
 	
-	Integer[] dirRank(int id, String dir, int row, int col, int rank, int initial)
+	// Gets the rank in a single direction
+	Integer[] dirRank(int id, String dir, int row, int col, int rank, int initial, int[][] board)
 	{
 		boolean move = false;
 		int last = -1;
 		
+		// Move in direction if possible
 		switch (dir)
 		{
 			case "ul":
@@ -372,27 +468,29 @@ public class Dondzila_AI_old
 				break;
 		}
 		
+		// determine initial piece
 		if (initial == -1 && move)
 		{
 			initial = board[row][col];
 		}
 		
+		// hit edge, no last piece
 		if (!move)
 		{
 			last = 0;
 		}
-		
-		int oid = id == 1 ? 2 : 1;
-		
-		if (move)
+		else
 		{
+			int oid = id == 1 ? 2 : 1;
+			
+			// Recursively add to rank based on pieces seen
     		if (id == initial && board[row][col] == id)
     		{
-    			return dirRank(id, dir, row, col, rank + 2, initial);
+    			return dirRank(id, dir, row, col, rank + 2, initial, board);
     		}
     		else if (oid == initial && board[row][col] == oid)
     		{
-    			return dirRank(id, dir, row, col, rank + 1, initial);
+    			return dirRank(id, dir, row, col, rank + 1, initial, board);
     		}
     		else
     		{
@@ -423,60 +521,54 @@ public class Dondzila_AI_old
 		
 		Dondzila_AI_old ai = new Dondzila_AI_old( board, playerNum, timeLimit, startTime );
 		
-		int col = ai.computeMove();
+		MoveNode move = ai.computeMove(ai.tree.getRoot(), board);
 		long total = System.currentTimeMillis() - startTime;
 		System.out.println( "\nTIME TAKEN: " + (total / 1000.f) + "s\n");
 		
-		System.exit(col);
+		System.exit(move.getCol());
 	}
-
 }
 
-class Cell
+// Used to start threads, each thread takes a starting move
+class AIRunnable_old implements Runnable
 {
-	private int row = -1;
-	private int col = -1;
-	private int rankP1 = 0;
-	private int rankP2 = 0;
+	private volatile MoveNode startNode;
+	private Dondzila_AI_old ai;
+	int[][] board;
+	Thread runner;
 	
-	public Cell(int row, int col)
+	public AIRunnable_old(MoveNode startNode, Dondzila_AI_old ai, int[][] board)
 	{
-		this.col = col;
-		this.row = row;
+		this.startNode = startNode;
+		this.ai = ai;
+		this.board = new int[6][7];
+		
+		// Needs a copy of the board
+		for (int i = 0; i < 6; i++)
+		{
+			System.arraycopy( board[i], 0, this.board[i], 0, 7 );
+		}
+		
+		runner = new Thread(this);
+	}
+
+	/* (non-Javadoc)
+	 * @see java.lang.Runnable#run()
+	 */
+	@Override
+	public void run()
+	{
+		// compute the move from starting move
+		MoveNode move = ai.computeMove( startNode, board );
+		startNode.setRank( move.getRank() );
+		startNode.setDepth( move.getDepth() );
 	}
 
 	/**
-	 * @return the col
+	 * @return the move
 	 */
-	public int getCol()
+	public MoveNode getMove()
 	{
-		return this.col;
-	}
-
-	/**
-	 * @return the row
-	 */
-	public int getRow()
-	{
-		return this.row;
-	}
-
-	/**
-	 * @return the rank
-	 */
-	public int getRank(int id)
-	{
-		return id == 1 ? this.rankP1 : this.rankP2;
-	}
-
-	/**
-	 * @param rank the rank to set
-	 */
-	public void setRank( int rank, int id )
-	{
-		if (id == 1)
-			this.rankP1 = rank;
-		else
-			this.rankP2 = rank;
+		return this.startNode;
 	}
 }
