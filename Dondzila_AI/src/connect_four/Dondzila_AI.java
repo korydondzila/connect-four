@@ -28,7 +28,9 @@ public class Dondzila_AI
 	int opponent;
 	int timeLimit;
 	long startTime;
-	ArrayList<Cell> possibleMoves = new ArrayList<Cell>();
+	MinMaxTree tree = new MinMaxTree();
+	ArrayList<MoveNode> possibleMoves = new ArrayList<MoveNode>();
+	Random r = new Random();
 	
 	/**
 	 * 
@@ -40,10 +42,7 @@ public class Dondzila_AI
 		this.opponent = player == 1 ? 2 : 1;
 		this.timeLimit = timeLimit;
 		this.startTime = startTime;
-	}
-	
-	public int computeMove()
-	{
+		
 		for (int i = 0; i < 7; i++)
 		{
 			if (board[0][i] == 0)
@@ -52,7 +51,7 @@ public class Dondzila_AI
 				{
 					if (board[j][i] == 0)
 					{
-						possibleMoves.add( new Cell(j, i) );
+						possibleMoves.add( new MoveNode(j, i, 1, player) );
 						break;
 					}
 					
@@ -60,100 +59,116 @@ public class Dondzila_AI
 			}
 		}
 		
+		tree.getRoot().addMoves( possibleMoves );
+	}
+	
+	public MoveNode computeMove()
+	{	
+		Node current = tree.getCurrent();
 		int best = Integer.MIN_VALUE;
-		ArrayList<Integer> bestCols = new ArrayList<Integer>();
-		Random r = new Random();
+		ArrayList<MoveNode> bestMoves = new ArrayList<MoveNode>();
 		
-		for (Cell p : possibleMoves)
+		for (MoveNode p : current.getPossibleMoves())
 		{
+			tree.setCurrent( p );
 			int row = p.getRow(), col = p.getCol();
-			System.out.println( "CELL: " + row + ", " + col );
-			computeRank(p, player);
-			board[row][col] = player;
-			int oBest = Integer.MIN_VALUE;
-			ArrayList<Cell> oBbestCells = new ArrayList<Cell>();
-			
-			for (Cell o: possibleMoves)
+			String space = "";
+			for (int s = 1; s < p.getHeight(); s++)
 			{
-				if (p.equals( o ))
+				space += " ";
+			}
+			System.out.println( space + "CELL: " + row + ", " + col );
+			computeRank(p, p.getPlayer());
+			
+			if (Integer.MAX_VALUE != p.getRank() && p.getHeight() < 6)
+			{
+				System.out.println( space + "RANK before: " + p.getRank() );
+				p.addMoves( current.getPossibleMoves() );
+				
+				if (!p.getPossibleMoves().isEmpty())
 				{
-					if (row > 0)
-					{
-						Cell temp = new Cell(row - 1, col);
-						System.out.println( "O CELL: " + temp.getRow() + ", " + temp.getCol() );
-						computeRank( temp, opponent );
-						o.setRank( temp.getRank( opponent ), opponent );
-					}
+					board[row][col] = p.getPlayer();
+					MoveNode m = computeMove();
+					p.setRank( m.getRank() );
+					p.setDepth( m.getDepth() );
+					board[row][col] = 0;
 				}
 				else
 				{
-					System.out.println( "O CELL: " + o.getRow() + ", " + o.getCol() );
-					computeRank( o, opponent );
-				}
-				
-				if (o.getRank( opponent ) > oBest)
-				{
-					oBest = o.getRank( opponent );
-					oBbestCells.clear();
-					oBbestCells.add( o );
-				}
-				else if (o.getRank( opponent ) == oBest)
-				{
-					oBbestCells.add( o );
+					p.setDepth( p.getHeight() );
 				}
 			}
+			else
+			{
+				p.setDepth( p.getHeight() );
+			}
 			
-			board[row][col] = 0;
-			Cell oBestCell = oBbestCells.get( r.nextInt( oBbestCells.size() ) );
-			System.out.println( "pRank: " + p.getRank(player) + " oRank: " + oBestCell.getRank(opponent) );
-			int rank = p.getRank(player) - oBestCell.getRank(opponent);
-			System.out.println( "RANK: " + rank );
+			int rank = p.getRank();
+			System.out.println( space + "RANK: " + rank );
 			
-			if (rank > best)
+			if (Integer.MAX_VALUE != rank)
+			{
+    			if (rank > best)
+    			{
+    				best = rank;
+    				bestMoves.clear();
+    				bestMoves.add( p );
+    			}
+    			else if (rank == best)
+    			{
+    				if (bestMoves.isEmpty())
+    				{
+    					bestMoves.add( p );
+    				}
+    				else if (p.getDepth() > bestMoves.get( 0 ).getDepth())
+    				{
+    					bestMoves.clear();
+        				bestMoves.add( p );
+    				}
+    				else if (p.getDepth() == bestMoves.get( 0 ).getDepth())
+    				{
+    					bestMoves.add( p );
+    				}
+    			}
+			}
+			else
 			{
 				best = rank;
-				bestCols.clear();
-				bestCols.add( p.getCol() );
-			}
-			else if (rank == best)
-			{
-				bestCols.add( p.getCol() );
+				bestMoves.clear();
+				bestMoves.add( p );
+				break;
 			}
 		}
 		
+		MoveNode ret = bestMoves.get( r.nextInt(bestMoves.size()) );
 		
-		return bestCols.get( r.nextInt(bestCols.size()) );
+		if (current != tree.getRoot())
+		{
+    		ret.setRank( ((MoveNode)current).getRank() - ret.getRank() );
+		}
+		
+		return ret;
 	}
 	
-	void computeRank(Cell c, int id)
+	void computeRank(MoveNode c, int id)
 	{
 		String[] dirs = {"ul", "l", "dl", "d", "dr", "r", "ur"};
 		Map<String, Integer[]> pRanks = new HashMap<String, Integer[]>();
 		
-		int oid = id == 1 ? 2 : 1;
+		int oid = c.getOpponent();
 		
 		for (String dir : dirs)
 		{
-			Integer[] dRank = dirRank(id, dir, c.getRow(), c.getCol(), 0, -1);
-			/*if (id == dRank[0] && dRank[1] >= 6)
-			{
-				dRank[1] += 10;
-			}
-			else if (oid == dRank[0] && dRank[1] >= 3)
-			{
-				dRank[1] += 5;
-			}*/
-			
-			pRanks.put( dir, dRank );
+			pRanks.put( dir, dirRank(id, dir, c.getRow(), c.getCol(), 0, -1) );
 		}
 		
 		int leftDiag = split( "ul", "dr", id, oid, pRanks );
 		int rightDiag = split( "dl", "ur", id, oid, pRanks );
 		int horiz = split( "l", "r", id, oid, pRanks );
-		int down = nonSplit( id, oid, pRanks.get("d") );
+		int down = downRank( c.getRow(), id, oid, pRanks.get("d") ); //nonSplit( id, oid, pRanks.get("d") );
 		int pRank = Math.max( leftDiag, Math.max( rightDiag, Math.max( horiz, down ) ) );
 		
-		c.setRank(pRank, id);
+		c.setRank(pRank);
 	}
 	
 	int split(String dir1, String dir2, int id, int oid, Map<String,Integer[]> pRanks)
@@ -173,11 +188,11 @@ public class Dondzila_AI
 		{
 			rank = s1[1] + s2[1];
 			
-			if (/*player == id && */id == s1[0] && rank >= 6)
+			if (id == s1[0] && rank >= 6)
 			{
 				rank = Integer.MAX_VALUE;
 			}
-			else if (/*player == id && */oid == s1[0] && rank >= 3)
+			else if (oid == s1[0] && rank >= 3)
 			{
 				rank = Integer.MAX_VALUE / 2;
 			}
@@ -305,11 +320,11 @@ public class Dondzila_AI
 	{
 		int rank = s[1];
 		
-		if (/*player == id && */id == s[0] && rank >= 6)
+		if (id == s[0] && rank >= 6)
 		{
 			rank = Integer.MAX_VALUE;
 		}
-		else if (/*player == id && */oid == s[0] && rank >= 3)
+		else if (oid == s[0] && rank >= 3)
 		{
 			rank = Integer.MAX_VALUE / 2;
 		}
@@ -436,60 +451,11 @@ public class Dondzila_AI
 		
 		Dondzila_AI ai = new Dondzila_AI( board, playerNum, timeLimit, startTime );
 		
-		int col = ai.computeMove();
+		MoveNode move = ai.computeMove();
 		long total = System.currentTimeMillis() - startTime;
 		System.out.println( "\nTIME TAKEN: " + (total / 1000.f) + "s\n");
 		
-		System.exit(col);
+		System.exit(move.getCol());
 	}
 
-}
-
-class Cell
-{
-	private int row = -1;
-	private int col = -1;
-	private int rankP1 = 0;
-	private int rankP2 = 0;
-	
-	public Cell(int row, int col)
-	{
-		this.col = col;
-		this.row = row;
-	}
-
-	/**
-	 * @return the col
-	 */
-	public int getCol()
-	{
-		return this.col;
-	}
-
-	/**
-	 * @return the row
-	 */
-	public int getRow()
-	{
-		return this.row;
-	}
-
-	/**
-	 * @return the rank
-	 */
-	public int getRank(int id)
-	{
-		return id == 1 ? this.rankP1 : this.rankP2;
-	}
-
-	/**
-	 * @param rank the rank to set
-	 */
-	public void setRank( int rank, int id )
-	{
-		if (id == 1)
-			this.rankP1 = rank;
-		else
-			this.rankP2 = rank;
-	}
 }
