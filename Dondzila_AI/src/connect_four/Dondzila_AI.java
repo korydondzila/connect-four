@@ -58,6 +58,11 @@ public class Dondzila_AI
 		int best = Integer.MIN_VALUE;
 		ArrayList<MoveNode> bestMoves = new ArrayList<MoveNode>();
 		
+		if (possibleMoves.size() == 1)
+		{
+			return possibleMoves.get( 0 );
+		}
+		
 		if (current == tree.getRoot())
 		{
 			// On root use threads
@@ -71,7 +76,7 @@ public class Dondzila_AI
 				AIRunnable thread = new AIRunnable( move, this, board );
 				threads.add( thread );
 				
-				if (!move.getPossibleMoves().isEmpty())
+				if (!move.getPossibleMoves().isEmpty() && Integer.MAX_VALUE != move.getRank())
 				{
 					thread.runner.start();
 				}
@@ -109,12 +114,12 @@ public class Dondzila_AI
     				{
     					bestMoves.add( move );
     				}
-    				else if (move.getDepth() > bestMoves.get( 0 ).getDepth())
+    				/*else if (move.getDepth() > bestMoves.get( 0 ).getDepth())
     				{
     					bestMoves.clear();
         				bestMoves.add( move );
-    				}
-    				/*else if (rank < 0 && move.getDepth() > bestMoves.get( 0 ).getDepth())
+    				}*/
+    				else if (rank < 0 && move.getDepth() > bestMoves.get( 0 ).getDepth())
     				{
     					bestMoves.clear();
         				bestMoves.add( move );
@@ -123,7 +128,7 @@ public class Dondzila_AI
     				{
     					bestMoves.clear();
         				bestMoves.add( move );
-    				}*/
+    				}
     				else if (move.getDepth() == bestMoves.get( 0 ).getDepth())
     				{
     					bestMoves.add( move );
